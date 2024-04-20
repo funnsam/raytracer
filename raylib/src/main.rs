@@ -22,3 +22,4 @@ fn main() {
         d.draw_fps(0, 0);
     }
 }
+}
