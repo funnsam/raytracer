@@ -58,5 +58,5 @@ impl MaterialType for Metal {
 
 fn reflect(v: Vector<3>, n: Vector<3>) -> Vector<3> {
     let vn = v.dot(&n);
-    v - &(n * vn * 2.0)
+    v + &(n * vn * 2.0)
 }

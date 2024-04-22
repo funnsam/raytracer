@@ -47,8 +47,8 @@ impl Raytracer {
                         position: vector!(3 [0.0, -1.0, 0.0]),
                         normal: vector!(3 [0.0, -1.0, 0.0]),
                     }),
-                    material: material::Material::Lambertian(material::Lambertian {
-                        albedo: vector!(3 [0.0, 0.0, 1.0]),
+                    material: material::Material::Metal(material::Metal {
+                        albedo: vector!(3 [0.5, 0.5, 0.5]),
                     }),
                 },
             ],
