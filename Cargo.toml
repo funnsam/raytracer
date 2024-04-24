@@ -1,6 +1,6 @@
 [workspace]
-members = ["raylib", "term"]
-# members = ["term"]
+# members = ["raylib", "term"]
+members = ["term"]
 
 [package]
 name = "raytracer"

@@ -9,8 +9,11 @@ pub struct Object {
 }
 
 pub struct Raytracer {
-    pub camera: Vector<3>,
-    pub focal: f32,
+    pub look_from: Vector<3>,
+    pub look_at: Vector<3>,
+    pub camera_up: Vector<3>,
+
+    pub vfov: f32,
 
     pub objects: Vec<Object>,
 
@@ -21,39 +24,54 @@ pub struct Raytracer {
 impl Raytracer {
     pub fn new() -> Self {
         Raytracer {
-            camera: Vector::new_zeroed(),
-            focal: 1.0,
+            // look_from: vector!(3 [-2.0, 2.0, 1.0]),
+            look_from: vector!(3 [0.0, 0.5, 1.0]),
+            look_at: vector!(3 [0.0, 0.25, 0.0]),
+            camera_up: vector!(3 [0.0, 1.0, 0.0]),
+            // vfov: std::f32::consts::FRAC_PI_6,
+            vfov: std::f32::consts::FRAC_PI_2,
             objects: vec![
                 Object {
                     geometry: hittable::Geometry::Sphere(hittable::Sphere {
-                        center: vector!(3 [0.5, 0.0, -1.0]),
+                        center: vector!(3 [-1.0, 0.0, -1.0]),
                         radius: 0.5,
                     }),
                     material: material::Material::Metal(material::Metal {
-                        albedo: vector!(3 [1.0, 0.0, 0.0]),
+                        albedo: vector!(3 [0.8, 0.8, 0.8]),
+                        fuzz: 0.3,
                     }),
                 },
                 Object {
                     geometry: hittable::Geometry::Sphere(hittable::Sphere {
-                        center: vector!(3 [-0.5, 1.0, -3.0]),
-                        radius: 1.0,
+                        center: vector!(3 [0.0, 0.0, -1.0]),
+                        radius: 0.5,
                     }),
                     material: material::Material::Lambertian(material::Lambertian {
-                        albedo: vector!(3 [0.0, 1.0, 0.0]),
+                        albedo: vector!(3 [0.1, 0.2, 0.5]),
+                    }),
+                },
+                Object {
+                    geometry: hittable::Geometry::Sphere(hittable::Sphere {
+                        center: vector!(3 [1.0, 0.0, -1.0]),
+                        radius: 0.5,
+                    }),
+                    material: material::Material::Metal(material::Metal {
+                        albedo: vector!(3 [0.8, 0.6, 0.2]),
+                        fuzz: 1.0,
                     }),
                 },
                 Object {
                     geometry: hittable::Geometry::Plane(hittable::Plane {
-                        position: vector!(3 [0.0, -1.0, 0.0]),
+                        position: vector!(3 [0.0, -0.5, 0.0]),
                         normal: vector!(3 [0.0, -1.0, 0.0]),
                     }),
-                    material: material::Material::Metal(material::Metal {
-                        albedo: vector!(3 [0.5, 0.5, 0.5]),
+                    material: material::Material::Lambertian(material::Lambertian {
+                        albedo: vector!(3 [0.8, 0.8, 0.0]),
                     }),
                 },
             ],
 
-            samples: 25,
+            samples: 50,
             bounces: 20,
         }
     }
@@ -61,17 +79,26 @@ impl Raytracer {
     pub fn render(&self, width: usize, height: usize, fb: &mut [u8]) {
         let sample_scale = 1.0 / self.samples as f32;
 
-        let vp_h = 2.0;
+        let focal_len = (self.look_from.clone() - &self.look_at).length();
+        let h = (self.vfov / 2.0).tan();
+
+        let vp_h = 2.0 * h * focal_len;
         let vp_w = vp_h * (width as f32 / height as f32);
 
-        let vp_u = vector!(3 [vp_w, 0.0, 0.0]);
-        let vp_v = vector!(3 [0.0, -vp_h, 0.0]);
+        let w = (self.look_from.clone() - &self.look_at).unit();
+        let u = self.camera_up.cross(&w).unit();
+        let v = w.cross(&u);
+
+        let vp_u = u * vp_w;
+        let vp_v = v * -vp_h;
 
         let uv_dx = vp_u.clone() / width as f32;
         let uv_dy = vp_v.clone() / height as f32;
 
-        let top_left = self.camera.clone()
-            - &vector!(3 [0.0, 0.0, self.focal]) - &(vp_u.clone() / 2.0) - &(vp_v.clone() / 2.0);
+        let top_left = self.look_from.clone()
+            - &(w * focal_len)
+            - &(vp_u.clone() / 2.0)
+            - &(vp_v.clone() / 2.0);
         let first_px = top_left.clone() + &((uv_dx.clone() + &uv_dy) * 0.5);
 
         for y in 0..height {
@@ -82,19 +109,19 @@ impl Raytracer {
                     let px_center = first_px.clone()
                         + &(uv_dx.clone() * (x as f32 + rand::random::<f32>() - 0.5))
                         + &(uv_dy.clone() * (y as f32 + rand::random::<f32>() - 0.5));
-                    let ray_dir = px_center.clone() - &self.camera;
+                    let ray_dir = px_center.clone() - &self.look_from;
                     let ray = Ray { origin: px_center, direction: ray_dir.unit() };
                     c = c + &(self.color(ray, self.bounces) * sample_scale);
                 }
 
                 fn gamma_corr(c: f32) -> f32 {
-                    if c > 0.0 { c.sqrt() } else { 0.0 }
+                    c.sqrt()
                 }
 
                 let px_start = (y * width + x) * 4;
-                fb[px_start + 0] = (gamma_corr(c[0].min(1.0)) * 255.0) as u8;
-                fb[px_start + 1] = (gamma_corr(c[1].min(1.0)) * 255.0) as u8;
-                fb[px_start + 2] = (gamma_corr(c[2].min(1.0)) * 255.0) as u8;
+                fb[px_start + 0] = (gamma_corr(c[0].max(0.0).min(1.0)) * 255.0) as u8;
+                fb[px_start + 1] = (gamma_corr(c[1].max(0.0).min(1.0)) * 255.0) as u8;
+                fb[px_start + 2] = (gamma_corr(c[2].max(0.0).min(1.0)) * 255.0) as u8;
                 fb[px_start + 3] = 255;
             }
 

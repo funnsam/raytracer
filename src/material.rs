@@ -28,12 +28,17 @@ pub struct Lambertian {
 }
 
 impl MaterialType for Lambertian {
-    fn scatter(&self, ray: Ray, rec: HitRecord) -> Option<ScatterInfo> {
-        let sd = (random_unit_vec() + &rec.normal).unit();
+    fn scatter(&self, _ray: Ray, rec: HitRecord) -> Option<ScatterInfo> {
+        let mut sd = random_unit_vec() + &rec.normal;
+
+        if near_zero(&sd) {
+            sd = rec.normal;
+        }
+
         Some(ScatterInfo {
             scattered: Ray {
                 origin: rec.p,
-                direction: sd,
+                direction: sd.unit(),
             },
             attenuation: self.albedo.clone(),
         })
@@ -41,22 +46,35 @@ impl MaterialType for Lambertian {
 }
 
 pub struct Metal {
-    pub albedo: Vector<3>
+    pub albedo: Vector<3>,
+    pub fuzz: f32,
 }
 
 impl MaterialType for Metal {
     fn scatter(&self, ray: Ray, rec: HitRecord) -> Option<ScatterInfo> {
-        Some(ScatterInfo {
-            scattered: Ray {
-                origin: rec.p,
-                direction: reflect(ray.direction, rec.normal),
-            },
-            attenuation: self.albedo.clone()
-        })
+        let reflect = reflect(ray.direction, rec.normal.clone());
+        let reflect = reflect.unit() + &(crate::random_unit_vec() * self.fuzz);
+
+        if reflect.dot(&rec.normal) < 0.0 {
+            Some(ScatterInfo {
+                scattered: Ray {
+                    origin: rec.p,
+                    direction: reflect,
+                },
+                attenuation: self.albedo.clone()
+            })
+        } else {
+            None
+        }
     }
 }
 
 fn reflect(v: Vector<3>, n: Vector<3>) -> Vector<3> {
     let vn = v.dot(&n);
-    v + &(n * vn * 2.0)
+    v - &(n * vn * 2.0)
+}
+
+fn near_zero(v: &Vector<3>) -> bool {
+    const S: f32 = 1e-6;
+    v[0].abs() < S && v[1].abs() < S && v[2].abs() < S
 }
