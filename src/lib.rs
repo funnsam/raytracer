@@ -1,4 +1,7 @@
+#![allow(mutable_transmutes)]
+
 use smolmatrix::*;
+use rayon::prelude::*;
 
 pub mod hittable;
 pub mod material;
@@ -26,49 +29,29 @@ impl Raytracer {
     pub fn new() -> Self {
         Raytracer {
             look_from: vector!(3 [-2.0, 2.0, 1.0]),
-            // look_from: vector!(3 [0.0, 0.5, 1.0]),
+            // look_from: vector!(3 [0.0, 0.0, 1.0]),
             look_at: vector!(3 [0.0, 0.0, -1.0]),
             camera_up: vector!(3 [0.0, 1.0, 0.0]),
-            vfov: std::f32::consts::FRAC_PI_6,
-            focal_len: 1.0,
+            vfov: std::f32::consts::FRAC_PI_4,
             // vfov: std::f32::consts::FRAC_PI_2,
+            focal_len: 1.0,
             objects: vec![
-                /*
-                Object {
-                    geometry: hittable::Geometry::Sphere(hittable::Sphere {
-                        center: vector!(3 [0.0, 0.0, -1.0]),
-                        radius: 0.5,
-                    }),
-                    material: material::Material::Lambertian(material::Lambertian {
-                        albedo: vector!(3 [0.5, 0.5, 0.5]),
-                    }),
-                    // material: material::Material::Metal(material::Metal {
-                    //     albedo: vector!(3 [0.8, 0.8, 0.8]),
-                    //     fuzz: 0.3,
-                    // }),
-                },
-                Object {
-                    geometry: hittable::Geometry::Sphere(hittable::Sphere {
-                        center: vector!(3 [0.0, -100.5, -1.0]),
-                        radius: 100.0,
-                    }),
-                    material: material::Material::Lambertian(material::Lambertian {
-                        albedo: vector!(3 [0.5, 0.5, 0.5]),
-                    }),
-                    // material: material::Material::Metal(material::Metal {
-                    //     albedo: vector!(3 [0.8, 0.8, 0.8]),
-                    //     fuzz: 0.3,
-                    // }),
-                },
-                */
                 Object {
                     geometry: hittable::Geometry::Sphere(hittable::Sphere {
                         center: vector!(3 [-1.0, 0.0, -1.0]),
                         radius: 0.5,
                     }),
-                    material: material::Material::Metal(material::Metal {
-                        albedo: vector!(3 [0.8, 0.8, 0.8]),
-                        fuzz: 0.3,
+                    material: material::Material::Dielectric(material::Dielectric {
+                        refraction_index: 1.5,
+                    }),
+                },
+                Object {
+                    geometry: hittable::Geometry::Sphere(hittable::Sphere {
+                        center: vector!(3 [-1.0, 0.0, -1.0]),
+                        radius: 0.4,
+                    }),
+                    material: material::Material::Dielectric(material::Dielectric {
+                        refraction_index: 1.0 / 1.5,
                     }),
                 },
                 Object {
@@ -130,7 +113,9 @@ impl Raytracer {
             - &(vp_v.clone() / 2.0);
         let first_px = top_left.clone() + &((uv_dx.clone() + &uv_dy) * 0.5);
 
-        for y in 0..height {
+        (0..height).into_par_iter().for_each(|y| {
+            let fb = unsafe { core::mem::transmute::<&_, &mut [u8]>(fb) };
+
             for x in 0..width {
                 let mut c = Matrix::new_zeroed();
 
@@ -156,7 +141,7 @@ impl Raytracer {
 
             #[cfg(feature = "report_progress")]
             println!("row {y} done");
-        }
+        });
     }
 
     fn color(&self, ray: Ray, depth: usize) -> Vector<3> {

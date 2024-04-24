@@ -12,6 +12,7 @@ pub trait MaterialType {
 pub enum Material {
     Lambertian(Lambertian),
     Metal(Metal),
+    Dielectric(Dielectric),
 }
 
 impl MaterialType for Material {
@@ -19,6 +20,7 @@ impl MaterialType for Material {
         match self {
             Self::Lambertian(l) => l.scatter(ray, rec),
             Self::Metal(m) => m.scatter(ray, rec),
+            Self::Dielectric(m) => m.scatter(ray, rec),
         }
     }
 }
@@ -73,4 +75,43 @@ fn reflect(v: Vector<3>, n: Vector<3>) -> Vector<3> {
 fn near_zero(v: &Vector<3>) -> bool {
     const S: f32 = 1e-6;
     v[0].abs() < S && v[1].abs() < S && v[2].abs() < S
+}
+
+pub struct Dielectric {
+    pub refraction_index: f32,
+}
+
+impl MaterialType for Dielectric {
+    fn scatter(&self, ray: Ray, rec: HitRecord) -> ScatterInfo {
+        let ri = if rec.front_face { 1.0 / self.refraction_index } else { self.refraction_index };
+        let cos_theta = (Matrix::new_zeroed() - &ray.direction).dot(&rec.normal).min(1.0);
+        let sin_theta = (1.0 - cos_theta * cos_theta).sqrt();
+
+        if ri * sin_theta > 1.0 || reflectance(cos_theta, ri) > rand::random() {
+            ScatterInfo {
+                scattered: Ray { origin: rec.p, direction: reflect(ray.direction, rec.normal).unit() },
+                attenuation: vector!(3 [1.0, 1.0, 1.0]),
+            }
+        } else {
+            ScatterInfo {
+                scattered: Ray { origin: rec.p, direction: refract(ray.direction, rec.normal, ri).unit() },
+                attenuation: vector!(3 [1.0, 1.0, 1.0]),
+            }
+        }
+    }
+}
+
+fn refract(uv: Vector<3>, n: Vector<3>, etai_ov_etat: f32) -> Vector<3> {
+    let cos_theta = (Matrix::new_zeroed() - &uv).dot(&n).min(1.0);
+
+    let r_out_perp = (n.clone() * cos_theta + &uv) * etai_ov_etat;
+    let r_out_parl = n * -(1.0 - r_out_perp.length_squared()).abs().sqrt();
+
+    r_out_perp + &r_out_parl
+}
+
+fn reflectance(cos_theta: f32, ri: f32) -> f32 {
+    let r0 = (1.0 - ri) / (1.0 + ri);
+    let r0 = r0 * r0;
+    r0 + (1.0 - r0) * (1.0 - cos_theta).powi(5)
 }
