@@ -85,7 +85,7 @@ impl Hittable for Plane {
     fn hit(&self, ray: &Ray, min: f32, max: f32) -> Option<HitRecord> {
         let d = self.normal.dot(&ray.direction);
         if d > 0.001 {
-            let t = (self.position.clone() - &ray.origin).dot(&self.normal);
+            let t = (self.position.clone() - &ray.origin).dot(&self.normal) / d;
 
             if t > min && max > t {
                 let p = ray.at(t);

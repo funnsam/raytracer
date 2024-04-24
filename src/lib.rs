@@ -25,8 +25,8 @@ pub struct Raytracer {
 impl Raytracer {
     pub fn new() -> Self {
         Raytracer {
-            // look_from: vector!(3 [-2.0, 2.0, 1.0]),
-            look_from: vector!(3 [0.0, 0.5, 1.0]),
+            look_from: vector!(3 [-2.0, 2.0, 1.0]),
+            // look_from: vector!(3 [0.0, 0.5, 1.0]),
             look_at: vector!(3 [0.0, 0.0, -1.0]),
             camera_up: vector!(3 [0.0, 1.0, 0.0]),
             vfov: std::f32::consts::FRAC_PI_6,
@@ -92,7 +92,7 @@ impl Raytracer {
                 },
                 Object {
                     geometry: hittable::Geometry::Plane(hittable::Plane {
-                        position: vector!(3 [0.0, -1.0, 0.0]),
+                        position: vector!(3 [0.0, -0.5, 0.0]),
                         normal: vector!(3 [0.0, -1.0, 0.0]),
                     }),
                     material: material::Material::Lambertian(material::Lambertian {
@@ -101,8 +101,8 @@ impl Raytracer {
                 },
             ],
 
-            samples: 50,
-            bounces: 20,
+            samples: 150,
+            bounces: 50,
         }
     }
 
