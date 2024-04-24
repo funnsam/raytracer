@@ -6,7 +6,7 @@ pub struct ScatterInfo {
 }
 
 pub trait MaterialType {
-    fn scatter(&self, ray: Ray, rec: HitRecord) -> Option<ScatterInfo>;
+    fn scatter(&self, ray: Ray, rec: HitRecord) -> ScatterInfo;
 }
 
 pub enum Material {
@@ -15,7 +15,7 @@ pub enum Material {
 }
 
 impl MaterialType for Material {
-    fn scatter(&self, ray: Ray, rec: HitRecord) -> Option<ScatterInfo> {
+    fn scatter(&self, ray: Ray, rec: HitRecord) -> ScatterInfo {
         match self {
             Self::Lambertian(l) => l.scatter(ray, rec),
             Self::Metal(m) => m.scatter(ray, rec),
@@ -28,20 +28,20 @@ pub struct Lambertian {
 }
 
 impl MaterialType for Lambertian {
-    fn scatter(&self, _ray: Ray, rec: HitRecord) -> Option<ScatterInfo> {
+    fn scatter(&self, _ray: Ray, rec: HitRecord) -> ScatterInfo {
         let mut sd = random_unit_vec() + &rec.normal;
 
         if near_zero(&sd) {
             sd = rec.normal;
         }
 
-        Some(ScatterInfo {
+        ScatterInfo {
             scattered: Ray {
                 origin: rec.p,
                 direction: sd.unit(),
             },
             attenuation: self.albedo.clone(),
-        })
+        }
     }
 }
 
@@ -51,20 +51,16 @@ pub struct Metal {
 }
 
 impl MaterialType for Metal {
-    fn scatter(&self, ray: Ray, rec: HitRecord) -> Option<ScatterInfo> {
-        let reflect = reflect(ray.direction, rec.normal.clone());
+    fn scatter(&self, ray: Ray, rec: HitRecord) -> ScatterInfo {
+        let reflect = reflect(ray.direction, rec.normal);
         let reflect = reflect.unit() + &(crate::random_unit_vec() * self.fuzz);
 
-        if reflect.dot(&rec.normal) < 0.0 {
-            Some(ScatterInfo {
-                scattered: Ray {
-                    origin: rec.p,
-                    direction: reflect,
-                },
-                attenuation: self.albedo.clone()
-            })
-        } else {
-            None
+        ScatterInfo {
+            scattered: Ray {
+                origin: rec.p,
+                direction: reflect,
+            },
+            attenuation: self.albedo.clone()
         }
     }
 }

@@ -14,6 +14,7 @@ pub struct Raytracer {
     pub camera_up: Vector<3>,
 
     pub vfov: f32,
+    pub focal_len: f32,
 
     pub objects: Vec<Object>,
 
@@ -26,11 +27,40 @@ impl Raytracer {
         Raytracer {
             // look_from: vector!(3 [-2.0, 2.0, 1.0]),
             look_from: vector!(3 [0.0, 0.5, 1.0]),
-            look_at: vector!(3 [0.0, 0.25, 0.0]),
+            look_at: vector!(3 [0.0, 0.0, -1.0]),
             camera_up: vector!(3 [0.0, 1.0, 0.0]),
-            // vfov: std::f32::consts::FRAC_PI_6,
-            vfov: std::f32::consts::FRAC_PI_2,
+            vfov: std::f32::consts::FRAC_PI_6,
+            focal_len: 1.0,
+            // vfov: std::f32::consts::FRAC_PI_2,
             objects: vec![
+                /*
+                Object {
+                    geometry: hittable::Geometry::Sphere(hittable::Sphere {
+                        center: vector!(3 [0.0, 0.0, -1.0]),
+                        radius: 0.5,
+                    }),
+                    material: material::Material::Lambertian(material::Lambertian {
+                        albedo: vector!(3 [0.5, 0.5, 0.5]),
+                    }),
+                    // material: material::Material::Metal(material::Metal {
+                    //     albedo: vector!(3 [0.8, 0.8, 0.8]),
+                    //     fuzz: 0.3,
+                    // }),
+                },
+                Object {
+                    geometry: hittable::Geometry::Sphere(hittable::Sphere {
+                        center: vector!(3 [0.0, -100.5, -1.0]),
+                        radius: 100.0,
+                    }),
+                    material: material::Material::Lambertian(material::Lambertian {
+                        albedo: vector!(3 [0.5, 0.5, 0.5]),
+                    }),
+                    // material: material::Material::Metal(material::Metal {
+                    //     albedo: vector!(3 [0.8, 0.8, 0.8]),
+                    //     fuzz: 0.3,
+                    // }),
+                },
+                */
                 Object {
                     geometry: hittable::Geometry::Sphere(hittable::Sphere {
                         center: vector!(3 [-1.0, 0.0, -1.0]),
@@ -62,7 +92,7 @@ impl Raytracer {
                 },
                 Object {
                     geometry: hittable::Geometry::Plane(hittable::Plane {
-                        position: vector!(3 [0.0, -0.5, 0.0]),
+                        position: vector!(3 [0.0, -1.0, 0.0]),
                         normal: vector!(3 [0.0, -1.0, 0.0]),
                     }),
                     material: material::Material::Lambertian(material::Lambertian {
@@ -79,10 +109,9 @@ impl Raytracer {
     pub fn render(&self, width: usize, height: usize, fb: &mut [u8]) {
         let sample_scale = 1.0 / self.samples as f32;
 
-        let focal_len = (self.look_from.clone() - &self.look_at).length();
         let h = (self.vfov / 2.0).tan();
 
-        let vp_h = 2.0 * h * focal_len;
+        let vp_h = 2.0 * h * self.focal_len;
         let vp_w = vp_h * (width as f32 / height as f32);
 
         let w = (self.look_from.clone() - &self.look_at).unit();
@@ -96,7 +125,7 @@ impl Raytracer {
         let uv_dy = vp_v.clone() / height as f32;
 
         let top_left = self.look_from.clone()
-            - &(w * focal_len)
+            - &(w * self.focal_len)
             - &(vp_u.clone() / 2.0)
             - &(vp_v.clone() / 2.0);
         let first_px = top_left.clone() + &((uv_dx.clone() + &uv_dy) * 0.5);
@@ -150,11 +179,8 @@ impl Raytracer {
         if let Some(r) = closest_rec {
             use material::MaterialType;
 
-            if let Some(s) = self.objects[closest_idx].material.scatter(ray, r) {
-                return s.attenuation * &self.color(s.scattered, depth - 1);
-            } else {
-                return Matrix::new_zeroed();
-            }
+            let s = self.objects[closest_idx].material.scatter(ray, r);
+            return s.attenuation * &self.color(s.scattered, depth - 1);
         }
 
         let a = 0.5 * (ray.direction[1] + 1.0);
@@ -195,8 +221,8 @@ fn random_unit_vec() -> Vector<3> {
     random_sphere_vec().unit()
 }
 
-fn random_hemisphere(n: &Vector<3>) -> Vector<3> {
-    let s = random_unit_vec();
-
-    if s.dot(n) < 0.0 { s } else { Matrix::new_zeroed() - &s }
-}
+// fn random_hemisphere(n: &Vector<3>) -> Vector<3> {
+//     let s = random_unit_vec();
+//
+//     if s.dot(n) < 0.0 { s } else { Matrix::new_zeroed() - &s }
+// }

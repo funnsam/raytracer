@@ -29,7 +29,7 @@ pub struct HitRecord {
 
 impl HitRecord {
     fn set_out(&mut self, ray: &Ray) {
-        let f = ray.direction.dot(&self.normal) > 0.0;
+        let f = ray.direction.dot(&self.normal) < 0.0;
         self.front_face = f;
 
         if !f {
