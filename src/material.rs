@@ -45,7 +45,7 @@ pub struct Lambertian {
 
 impl MaterialType for Lambertian {
     fn scatter(&self, _ray: Ray, rec: HitRecord) -> Option<ScatterInfo> {
-        let mut sd = random_unit_vec() + &rec.normal;
+        let mut sd = random_unit_vec3() + &rec.normal;
 
         if near_zero(&sd) {
             sd = rec.normal;
@@ -69,7 +69,7 @@ pub struct Metal {
 impl MaterialType for Metal {
     fn scatter(&self, ray: Ray, rec: HitRecord) -> Option<ScatterInfo> {
         let reflect = reflect(ray.direction, rec.normal);
-        let reflect = reflect.unit() + &(crate::random_unit_vec() * self.fuzz);
+        let reflect = reflect.unit() + &(crate::random_unit_vec3() * self.fuzz);
 
         Some(ScatterInfo {
             scattered: Ray {

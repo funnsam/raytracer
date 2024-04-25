@@ -19,7 +19,9 @@ pub struct Raytracer {
     pub camera_up: Vector<3>,
 
     pub vfov: f32,
-    pub focal_len: f32,
+
+    pub focus_angle: f32,
+    pub focus_dist: f32,
 
     pub objects: Vec<Object>,
 
@@ -35,7 +37,8 @@ impl Raytracer {
             look_at: vector!(3 [0.0, 0.0, -1.0]),
             camera_up: vector!(3 [0.0, 1.0, 0.0]),
             vfov: std::f32::consts::FRAC_PI_2,
-            focal_len: 1.0,
+            focus_angle: std::f32::consts::PI / 20.0,
+            focus_dist: 1.475,
             objects: vec![
                 Object {
                     geometry: Geometry::Plane(Plane {
@@ -44,7 +47,7 @@ impl Raytracer {
                     }),
                     material: Material::Lambertian(Lambertian {
                         albedo: vector!(3 [0.73, 0.73, 0.73]),
-                    })
+                    }),
                 },
                 Object {
                     geometry: Geometry::Plane(Plane {
@@ -53,7 +56,7 @@ impl Raytracer {
                     }),
                     material: Material::Lambertian(Lambertian {
                         albedo: vector!(3 [0.73, 0.73, 0.73]),
-                    })
+                    }),
                 },
                 Object {
                     geometry: Geometry::Plane(Plane {
@@ -62,7 +65,7 @@ impl Raytracer {
                     }),
                     material: Material::Lambertian(Lambertian {
                         albedo: vector!(3 [0.73, 0.73, 0.73]),
-                    })
+                    }),
                 },
                 Object {
                     geometry: Geometry::Plane(Plane {
@@ -71,7 +74,7 @@ impl Raytracer {
                     }),
                     material: Material::Lambertian(Lambertian {
                         albedo: vector!(3 [0.65, 0.05, 0.05]),
-                    })
+                    }),
                 },
                 Object {
                     geometry: Geometry::Plane(Plane {
@@ -80,7 +83,7 @@ impl Raytracer {
                     }),
                     material: Material::Lambertian(Lambertian {
                         albedo: vector!(3 [0.12, 0.45, 0.15]),
-                    })
+                    }),
                 },
                 Object {
                     geometry: Geometry::Quad(Quad {
@@ -90,7 +93,7 @@ impl Raytracer {
                     }),
                     material: Material::DiffuseLight(DiffuseLight {
                         emits: vector!(3 [4.0, 4.0, 4.0]),
-                    })
+                    }),
                 },
                 // Cornell box objects
                 Object {
@@ -99,9 +102,9 @@ impl Raytracer {
                         radius: 0.35
                     }),
                     material: Material::Metal(Metal {
-                        albedo: vector!(3 [0.7, 0.7, 0.7]),
-                        fuzz: 0.1,
-                    })
+                        albedo: vector!(3 [0.8, 0.8, 0.8]),
+                        fuzz: 0.2,
+                    }),
                 },
                 Object {
                     geometry: Geometry::Sphere(Sphere {
@@ -109,9 +112,9 @@ impl Raytracer {
                         radius: 0.4
                     }),
                     material: Material::Metal(Metal {
-                        albedo: vector!(3 [0.8, 0.8, 0.8]),
-                        fuzz: 0.1,
-                    })
+                        albedo: vector!(3 [0.8, 0.6, 0.2]),
+                        fuzz: 0.7,
+                    }),
                 },
             ],
 
@@ -181,7 +184,7 @@ impl Raytracer {
             ],
             */
 
-            samples: 300,
+            samples: 1000,
             bounces: 50,
         }
     }
@@ -191,21 +194,21 @@ impl Raytracer {
 
         let h = (self.vfov / 2.0).tan();
 
-        let vp_h = 2.0 * h * self.focal_len;
+        let vp_h = 2.0 * h * self.focus_dist;
         let vp_w = vp_h * (width as f32 / height as f32);
 
         let w = (self.look_from.clone() - &self.look_at).unit();
         let u = self.camera_up.cross(&w).unit();
         let v = w.cross(&u);
 
-        let vp_u = u * vp_w;
-        let vp_v = v * -vp_h;
+        let vp_u = u.clone() * vp_w;
+        let vp_v = v.clone() * -vp_h;
 
         let uv_dx = vp_u.clone() / width as f32;
         let uv_dy = vp_v.clone() / height as f32;
 
         let top_left = self.look_from.clone()
-            - &(w * self.focal_len)
+            - &(w * self.focus_dist)
             - &(vp_u.clone() / 2.0)
             - &(vp_v.clone() / 2.0);
         let first_px = top_left.clone() + &((uv_dx.clone() + &uv_dy) * 0.5);
@@ -213,15 +216,20 @@ impl Raytracer {
         (0..height).into_par_iter().for_each(|y| {
             let fb = unsafe { core::mem::transmute::<&_, &mut [u8]>(fb) };
 
+            let defoc_rad = self.focus_dist * (self.focus_angle / 2.0).tan();
+            let defoc_u = u.clone() * defoc_rad;
+            let defoc_v = v.clone() * defoc_rad;
+
             for x in 0..width {
                 let mut c = Matrix::new_zeroed();
 
                 for _ in 0..self.samples {
-                    let px_center = first_px.clone()
+                    let sample = first_px.clone()
                         + &(uv_dx.clone() * (x as f32 + rand::random::<f32>() - 0.5))
                         + &(uv_dy.clone() * (y as f32 + rand::random::<f32>() - 0.5));
-                    let ray_dir = px_center.clone() - &self.look_from;
-                    let ray = Ray { origin: px_center, direction: ray_dir.unit() };
+                    let origin = self.defoc_sample(defoc_u.clone(), defoc_v.clone());
+                    let ray_dir = sample.clone() - &origin;
+                    let ray = Ray { origin, direction: ray_dir.unit() };
                     c = c + &(self.color(ray, self.bounces) * sample_scale);
                 }
 
@@ -239,6 +247,11 @@ impl Raytracer {
             #[cfg(feature = "report_progress")]
             println!("row {y} done");
         });
+    }
+
+    fn defoc_sample(&self, du: Vector<3>, dv: Vector<3>) -> Vector<3> {
+        let d = random_unit_vec2();
+        self.look_from.clone() + &(du * d[0]) + &(dv * d[1])
     }
 
     fn color(&self, ray: Ray, depth: usize) -> Vector<3> {
@@ -286,7 +299,7 @@ impl Ray {
     }
 }
 
-fn random_vec() -> Vector<3> {
+fn random_vec3() -> Vector<3> {
     vector!(3 [
         rand::random::<f32>() * 2.0 - 1.0,
         rand::random::<f32>() * 2.0 - 1.0,
@@ -294,21 +307,28 @@ fn random_vec() -> Vector<3> {
     ])
 }
 
-fn random_sphere_vec() -> Vector<3> {
+fn random_unit_vec3() -> Vector<3> {
     loop {
-        let v = random_vec();
+        let v = random_vec3();
         if v.length_squared() < 1.0 {
-            return v;
+            return v.unit();
         }
     }
 }
 
-fn random_unit_vec() -> Vector<3> {
-    random_sphere_vec().unit()
+fn random_vec2() -> Vector<3> {
+    vector!(3 [
+        rand::random::<f32>() * 2.0 - 1.0,
+        rand::random::<f32>() * 2.0 - 1.0,
+        0.0,
+    ])
 }
 
-// fn random_hemisphere(n: &Vector<3>) -> Vector<3> {
-//     let s = random_unit_vec();
-//
-//     if s.dot(n) < 0.0 { s } else { Matrix::new_zeroed() - &s }
-// }
+fn random_unit_vec2() -> Vector<3> {
+    loop {
+        let v = random_vec2();
+        if v.length_squared() < 1.0 {
+            return v.unit();
+        }
+    }
+}
