@@ -1,5 +1,5 @@
-const WIDTH: usize = 300;
-const HEIGHT: usize = 300;
+const WIDTH: usize = 500;
+const HEIGHT: usize = 500;
 
 fn main() {
     let mut fb = vec![0; WIDTH * HEIGHT * 4];

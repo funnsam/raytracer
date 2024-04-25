@@ -101,19 +101,18 @@ impl Raytracer {
                         center: vector!(3 [0.25, -0.65, -1.35]),
                         radius: 0.35
                     }),
-                    material: Material::Metal(Metal {
-                        albedo: vector!(3 [0.8, 0.8, 0.8]),
-                        fuzz: 0.2,
+                    material: Material::Dielectric(Dielectric {
+                        refraction_index: 1.5,
                     }),
                 },
                 Object {
                     geometry: Geometry::Sphere(Sphere {
-                        center: vector!(3 [-0.25, -0.6, -1.6]),
-                        radius: 0.4
+                        center: vector!(3 [-0.25, -0.65, -1.6]),
+                        radius: 0.35
                     }),
                     material: Material::Metal(Metal {
-                        albedo: vector!(3 [0.8, 0.6, 0.2]),
-                        fuzz: 0.7,
+                        albedo: vector!(3 [0.8, 0.8, 0.8]),
+                        fuzz: 0.3,
                     }),
                 },
             ],

@@ -49,20 +49,19 @@ impl Hittable for Sphere {
     fn hit(&self, ray: &Ray, min: f32, max: f32) -> Option<HitRecord> {
         let oc = self.center.clone() - &ray.origin;
 
-        let a = ray.direction.length_squared();
         let h = ray.direction.dot(&oc);
         let c = oc.length_squared() - self.radius * self.radius;
 
 
-        let d = h * h - a * c;
+        let d = h * h - c;
         if d < 0.0 {
             return None;
         }
 
         let sqrtd = d.sqrt();
-        let mut root = (h - sqrtd) / a;
+        let mut root = h - sqrtd;
         if root <= min || max <= root {
-            root = (h + sqrtd) / a;
+            root = h + sqrtd;
             if root <= min || max <= root {
                 return None;
             }
