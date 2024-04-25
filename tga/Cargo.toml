@@ -1,0 +1,7 @@
+[package]
+name = "tga"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+raytracer = { version = "0.1.0", path = "..", features = ["report_progress"] }

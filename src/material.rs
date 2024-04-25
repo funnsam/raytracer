@@ -1,4 +1,4 @@
-use crate::{*, hittable::*};
+use crate::*;
 
 pub struct ScatterInfo {
     pub scattered: Ray,

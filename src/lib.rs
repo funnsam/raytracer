@@ -38,7 +38,7 @@ impl Raytracer {
             camera_up: vector!(3 [0.0, 1.0, 0.0]),
             vfov: std::f32::consts::FRAC_PI_2,
             focus_angle: std::f32::consts::PI / 20.0,
-            focus_dist: 1.475,
+            focus_dist: 1.35,
             objects: vec![
                 Object {
                     geometry: Geometry::Plane(Plane {
@@ -185,7 +185,7 @@ impl Raytracer {
             */
 
             samples: 1000,
-            bounces: 50,
+            bounces: 200,
         }
     }
 
@@ -230,7 +230,7 @@ impl Raytracer {
                     let origin = self.defoc_sample(defoc_u.clone(), defoc_v.clone());
                     let ray_dir = sample.clone() - &origin;
                     let ray = Ray { origin, direction: ray_dir.unit() };
-                    c = c + &(self.color(ray, self.bounces) * sample_scale);
+                    c = c + &(self.color(ray) * sample_scale);
                 }
 
                 fn gamma_corr(c: f32) -> f32 {
@@ -254,36 +254,46 @@ impl Raytracer {
         self.look_from.clone() + &(du * d[0]) + &(dv * d[1])
     }
 
-    fn color(&self, ray: Ray, depth: usize) -> Vector<3> {
-        if depth == 0 {
-            return Matrix::new_zeroed();
-        }
+    fn color(&self, mut ray: Ray) -> Vector<3> {
+        let mut color = Matrix::new_zeroed();
+        let mut throughput = vector!(3 [1.0, 1.0, 1.0]);
 
-        let mut closest_dst = f32::INFINITY;
-        let mut closest_rec = None;
-        let mut closest_idx = 0;
-        for (i, obj) in self.objects.iter().enumerate() {
-            use hittable::Hittable;
-            if let Some(r) = obj.geometry.hit(&ray, 0.001, closest_dst) {
-                closest_dst = r.depth;
-                closest_rec = Some(r);
-                closest_idx = i;
+        for _ in 0..self.bounces {
+            let mut closest_dst = f32::INFINITY;
+            let mut closest_rec = None;
+            let mut closest_idx = 0;
+            for (i, obj) in self.objects.iter().enumerate() {
+                if let Some(r) = obj.geometry.hit(&ray, 0.001, closest_dst) {
+                    closest_dst = r.depth;
+                    closest_rec = Some(r);
+                    closest_idx = i;
+                }
             }
-        }
 
-        if let Some(r) = closest_rec {
-            use material::MaterialType;
-            let mat = &self.objects[closest_idx].material;
-            let emits = mat.emits(&ray, &r);
+            if let Some(r) = closest_rec {
+                let mat = &self.objects[closest_idx].material;
+                let emits = mat.emits(&ray, &r);
 
-            if let Some(s) = mat.scatter(ray, r) {
-                s.attenuation * &self.color(s.scattered, depth - 1) + &emits
+                if let Some(s) = mat.scatter(ray, r) {
+                    throughput = throughput * &s.attenuation;
+
+                    let p = throughput[0].max(throughput[1]).max(throughput[2]);
+                    if rand::random::<f32>() > p {
+                        break;
+                    }
+
+                    throughput = throughput / p;
+                    ray = s.scattered;
+                } else {
+                    color = color + &(emits * &throughput);
+                    break;
+                }
             } else {
-                emits
+                break;
             }
-        } else {
-            Vector::new_zeroed()
         }
+
+        color
     }
 }
 

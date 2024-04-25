@@ -115,17 +115,16 @@ impl Hittable for Quad {
     fn hit(&self, ray: &Ray, min: f32, max: f32) -> Option<HitRecord> {
         let n = self.u.cross(&self.v);
         let normal = n.clone().unit();
-        let d = normal.dot(&self.position);
         let ndn = n.dot(&n);
         let w = n / ndn;
 
-        let denom = normal.dot(&ray.direction);
+        let d = normal.dot(&ray.direction);
 
-        if denom <= 0.001 {
+        if d <= 0.001 {
             return None;
         }
 
-        let t = (self.position.clone() - &ray.origin).dot(&normal) / denom;
+        let t = (self.position.clone() - &ray.origin).dot(&normal) / d;
 
         if t <= min || max <= t {
             return None;
