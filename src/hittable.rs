@@ -7,6 +7,7 @@ pub trait Hittable where Self: Sized {
 pub enum Geometry {
     Sphere(Sphere),
     Plane(Plane),
+    Quad(Quad),
 }
 
 impl Hittable for Geometry {
@@ -14,6 +15,7 @@ impl Hittable for Geometry {
         match self {
             Self::Sphere(s) => s.hit(ray, min, max),
             Self::Plane(p) => p.hit(ray, min, max),
+            Self::Quad(p) => p.hit(ray, min, max),
         }
     }
 }
@@ -84,20 +86,68 @@ pub struct Plane {
 impl Hittable for Plane {
     fn hit(&self, ray: &Ray, min: f32, max: f32) -> Option<HitRecord> {
         let d = self.normal.dot(&ray.direction);
-        if d > 0.001 {
-            let t = (self.position.clone() - &ray.origin).dot(&self.normal) / d;
 
-            if t > min && max > t {
-                let p = ray.at(t);
-                let mut rec = HitRecord {
-                    p, normal: self.normal.clone(), depth: t, front_face: false };
-                rec.set_out(ray);
-                Some(rec)
-            } else {
-                None
-            }
-        } else {
-            None
+        if d <= 0.001 {
+            return None;
         }
+
+        let t = (self.position.clone() - &ray.origin).dot(&self.normal) / d;
+
+        if t <= min || max <= t {
+            return None;
+        }
+
+        let p = ray.at(t);
+        let mut rec = HitRecord {
+            p, normal: Matrix::new_zeroed() - &self.normal, depth: t, front_face: false };
+        rec.set_out(ray);
+        Some(rec)
+    }
+}
+
+pub struct Quad {
+    pub position: Vector<3>,
+    pub u: Vector<3>,
+    pub v: Vector<3>,
+}
+
+impl Hittable for Quad {
+    fn hit(&self, ray: &Ray, min: f32, max: f32) -> Option<HitRecord> {
+        let n = self.u.cross(&self.v);
+        let normal = n.clone().unit();
+        let d = normal.dot(&self.position);
+        let ndn = n.dot(&n);
+        let w = n / ndn;
+
+        let denom = normal.dot(&ray.direction);
+
+        if denom <= 0.001 {
+            return None;
+        }
+
+        let t = (self.position.clone() - &ray.origin).dot(&normal) / denom;
+
+        if t <= min || max <= t {
+            return None;
+        }
+
+        let p = ray.at(t);
+        let hitpt = p.clone() - &self.position;
+        let alpha = w.dot(&hitpt.cross(&self.v));
+
+        if alpha < 0.0 || 1.0 < alpha {
+            return None;
+        }
+
+        let beta = w.dot(&self.u.cross(&hitpt));
+
+        if beta < 0.0 || 1.0 < beta {
+            return None;
+        }
+
+        let mut rec = HitRecord {
+            p, normal, depth: t, front_face: false };
+        rec.set_out(ray);
+        Some(rec)
     }
 }

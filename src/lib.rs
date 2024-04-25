@@ -4,7 +4,9 @@ use smolmatrix::*;
 use rayon::prelude::*;
 
 pub mod hittable;
+use hittable::*;
 pub mod material;
+use material::*;
 
 pub struct Object {
     pub geometry: hittable::Geometry,
@@ -28,14 +30,108 @@ pub struct Raytracer {
 impl Raytracer {
     pub fn new() -> Self {
         Raytracer {
+            // Cornell box
+            look_from: vector!(3 [0.0, 0.0, 0.0]),
+            look_at: vector!(3 [0.0, 0.0, -1.0]),
+            camera_up: vector!(3 [0.0, 1.0, 0.0]),
+            vfov: std::f32::consts::FRAC_PI_2,
+            focal_len: 1.0,
+            objects: vec![
+                Object {
+                    geometry: Geometry::Plane(Plane {
+                        position: vector!(3 [0.0, -1.0, 0.0]),
+                        normal: vector!(3 [0.0, -1.0, 0.0]),
+                    }),
+                    material: Material::Lambertian(Lambertian {
+                        albedo: vector!(3 [0.73, 0.73, 0.73]),
+                    })
+                },
+                Object {
+                    geometry: Geometry::Plane(Plane {
+                        position: vector!(3 [0.0, 1.0, 0.0]),
+                        normal: vector!(3 [0.0, 1.0, 0.0]),
+                    }),
+                    material: Material::Lambertian(Lambertian {
+                        albedo: vector!(3 [0.73, 0.73, 0.73]),
+                    })
+                },
+                Object {
+                    geometry: Geometry::Plane(Plane {
+                        position: vector!(3 [0.0, 0.0, -2.0]),
+                        normal: vector!(3 [0.0, 0.0, -1.0]),
+                    }),
+                    material: Material::Lambertian(Lambertian {
+                        albedo: vector!(3 [0.73, 0.73, 0.73]),
+                    })
+                },
+                Object {
+                    geometry: Geometry::Plane(Plane {
+                        position: vector!(3 [1.0, 0.0, 0.0]),
+                        normal: vector!(3 [1.0, 0.0, 0.0]),
+                    }),
+                    material: Material::Lambertian(Lambertian {
+                        albedo: vector!(3 [0.65, 0.05, 0.05]),
+                    })
+                },
+                Object {
+                    geometry: Geometry::Plane(Plane {
+                        position: vector!(3 [-1.0, 0.0, 0.0]),
+                        normal: vector!(3 [-1.0, 0.0, 0.0]),
+                    }),
+                    material: Material::Lambertian(Lambertian {
+                        albedo: vector!(3 [0.12, 0.45, 0.15]),
+                    })
+                },
+                Object {
+                    geometry: Geometry::Quad(Quad {
+                        position: vector!(3 [-0.5, 0.99, -0.5]),
+                        u: vector!(3 [0.0, 0.0, -1.0]),
+                        v: vector!(3 [1.0, 0.0, 0.0]),
+                    }),
+                    material: Material::DiffuseLight(DiffuseLight {
+                        emits: vector!(3 [4.0, 4.0, 4.0]),
+                    })
+                },
+                // Cornell box objects
+                Object {
+                    geometry: Geometry::Sphere(Sphere {
+                        center: vector!(3 [0.25, -0.65, -1.35]),
+                        radius: 0.35
+                    }),
+                    material: Material::Metal(Metal {
+                        albedo: vector!(3 [0.7, 0.7, 0.7]),
+                        fuzz: 0.1,
+                    })
+                },
+                Object {
+                    geometry: Geometry::Sphere(Sphere {
+                        center: vector!(3 [-0.25, -0.6, -1.6]),
+                        radius: 0.4
+                    }),
+                    material: Material::Metal(Metal {
+                        albedo: vector!(3 [0.8, 0.8, 0.8]),
+                        fuzz: 0.1,
+                    })
+                },
+            ],
+
+            /*
+            // Simple scene with balls
             look_from: vector!(3 [-2.0, 2.0, 1.0]),
-            // look_from: vector!(3 [0.0, 0.0, 1.0]),
             look_at: vector!(3 [0.0, 0.0, -1.0]),
             camera_up: vector!(3 [0.0, 1.0, 0.0]),
             vfov: std::f32::consts::FRAC_PI_4,
-            // vfov: std::f32::consts::FRAC_PI_2,
             focal_len: 1.0,
             objects: vec![
+                Object {
+                    geometry: hittable::Geometry::Sphere(hittable::Sphere {
+                        center: vector!(3 [0.0, 3.0, -3.0]),
+                        radius: 1.0,
+                    }),
+                    material: material::Material::DiffuseLight(material::DiffuseLight {
+                        emits: vector!(3 [4.0, 4.0, 3.6]),
+                    }),
+                },
                 Object {
                     geometry: hittable::Geometry::Sphere(hittable::Sphere {
                         center: vector!(3 [-1.0, 0.0, -1.0]),
@@ -83,8 +179,9 @@ impl Raytracer {
                     }),
                 },
             ],
+            */
 
-            samples: 150,
+            samples: 300,
             bounces: 50,
         }
     }
@@ -163,13 +260,17 @@ impl Raytracer {
 
         if let Some(r) = closest_rec {
             use material::MaterialType;
+            let mat = &self.objects[closest_idx].material;
+            let emits = mat.emits(&ray, &r);
 
-            let s = self.objects[closest_idx].material.scatter(ray, r);
-            return s.attenuation * &self.color(s.scattered, depth - 1);
+            if let Some(s) = mat.scatter(ray, r) {
+                s.attenuation * &self.color(s.scattered, depth - 1) + &emits
+            } else {
+                emits
+            }
+        } else {
+            Vector::new_zeroed()
         }
-
-        let a = 0.5 * (ray.direction[1] + 1.0);
-        vector!(3 [1.0, 1.0, 1.0]) * (1.0 - a) + &(vector!(3 [0.5, 0.7, 1.0]) * a)
     }
 }
 
