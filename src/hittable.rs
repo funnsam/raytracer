@@ -4,6 +4,24 @@ pub trait Hittable where Self: Sized {
     fn hit(&self, ray: &Ray, min: f32, max: f32) -> Option<HitRecord>;
 }
 
+pub struct World(pub Vec<Object>);
+
+impl World {
+    pub fn hit(&self, ray: &Ray, min: f32, mut max: f32) -> Option<(HitRecord, usize)> {
+        let mut rec = None;
+        let mut idx = 0;
+        for (i, obj) in self.0.iter().enumerate() {
+            if let Some(r) = obj.geometry.hit(&ray, min, max) {
+                max = r.depth;
+                rec = Some(r);
+                idx = i;
+            }
+        }
+
+        rec.map(|a| (a, idx))
+    }
+}
+
 pub enum Geometry {
     Sphere(Sphere),
     Plane(Plane),

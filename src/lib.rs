@@ -23,7 +23,8 @@ pub struct Raytracer {
     pub focus_angle: f32,
     pub focus_dist: f32,
 
-    pub objects: Vec<Object>,
+    pub world: World,
+    pub lights: Vec<Vector<3>>,
 
     pub samples: usize,
     pub bounces: usize,
@@ -39,7 +40,7 @@ impl Raytracer {
             vfov: std::f32::consts::FRAC_PI_2,
             focus_angle: std::f32::consts::PI / 20.0,
             focus_dist: 1.35,
-            objects: vec![
+            world: World(vec![
                 Object {
                     geometry: Geometry::Plane(Plane {
                         position: vector!(3 [0.0, -1.0, 0.0]),
@@ -115,6 +116,10 @@ impl Raytracer {
                         fuzz: 0.3,
                     }),
                 },
+            ]),
+
+            lights: vec![
+                vector!(3 [1.0, 0.0, 0.0]),
             ],
 
             /*
@@ -183,8 +188,8 @@ impl Raytracer {
             ],
             */
 
-            samples: 1000,
-            bounces: 200,
+            samples: 16,
+            bounces: 20,
         }
     }
 
@@ -258,24 +263,24 @@ impl Raytracer {
         let mut throughput = vector!(3 [1.0, 1.0, 1.0]);
 
         for _ in 0..self.bounces {
-            let mut closest_dst = f32::INFINITY;
-            let mut closest_rec = None;
-            let mut closest_idx = 0;
-            for (i, obj) in self.objects.iter().enumerate() {
-                if let Some(r) = obj.geometry.hit(&ray, 0.001, closest_dst) {
-                    closest_dst = r.depth;
-                    closest_rec = Some(r);
-                    closest_idx = i;
-                }
-            }
+            if let Some((r, idx)) = self.world.hit(&ray, 0.001, f32::INFINITY) {
+                let mat = &self.world.0[idx].material;
+                let mut emits = mat.emits(&ray, &r);
 
-            if let Some(r) = closest_rec {
-                let mat = &self.objects[closest_idx].material;
-                let emits = mat.emits(&ray, &r);
+                // nee optimization
+                if let Some(sl_at) = self.get_sample_light() {
+                    let sl_dir = (sl_at.clone() - &r.p).unit();
+                    let sl_ray = Ray { origin: r.p.clone(), direction: sl_dir };
+
+                    if let Some(sl_emits) = self.world.hit(&sl_ray, 0.01, f32::INFINITY).map(|(r, i)| self.world.0[i].material.emits(&sl_ray, &r)) {
+                        emits = (emits + &sl_emits) * 0.5;
+                    }
+                }
 
                 if let Some(s) = mat.scatter(ray, r) {
                     throughput = throughput * &s.attenuation;
 
+                    // russian roulette
                     let p = throughput[0].max(throughput[1]).max(throughput[2]);
                     if rand::random::<f32>() > p {
                         break;
@@ -283,6 +288,7 @@ impl Raytracer {
 
                     throughput = throughput / p;
                     ray = s.scattered;
+                    color = color + &(emits * &throughput);
                 } else {
                     color = color + &(emits * &throughput);
                     break;
@@ -293,6 +299,11 @@ impl Raytracer {
         }
 
         color
+    }
+
+    fn get_sample_light(&self) -> Option<&Vector<3>> {
+        // None
+        Some(&self.lights[rand::random::<usize>() % self.lights.len()])
     }
 }
 
