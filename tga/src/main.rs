@@ -1,5 +1,5 @@
-const WIDTH: usize = 500;
-const HEIGHT: usize = 500;
+const WIDTH: usize = 1920;
+const HEIGHT: usize = 1080;
 
 fn main() {
     let mut fb = vec![0; WIDTH * HEIGHT * 4];
@@ -19,10 +19,10 @@ fn main() {
     file.push(0);
     file.push(HEIGHT as u8); // y
     file.push((HEIGHT >> 8) as u8);
-    file.push(HEIGHT as u8); // h
-    file.push((HEIGHT >> 8) as u8);
     file.push(WIDTH as u8); // w
     file.push((WIDTH >> 8) as u8);
+    file.push(HEIGHT as u8); // h
+    file.push((HEIGHT >> 8) as u8);
     file.push(32); // bpp
     file.push(40); // pixeltype
 

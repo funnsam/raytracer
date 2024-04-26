@@ -92,6 +92,7 @@ fn near_zero(v: &Vector<3>) -> bool {
 }
 
 pub struct Dielectric {
+    pub attenuation: Vector<3>,
     pub refraction_index: f32,
 }
 
@@ -104,12 +105,12 @@ impl MaterialType for Dielectric {
         Some(if ri * sin_theta > 1.0 || reflectance(cos_theta, ri) > rand::random() {
             ScatterInfo {
                 scattered: Ray { origin: rec.p, direction: reflect(ray.direction, rec.normal).unit() },
-                attenuation: vector!(3 [1.0, 1.0, 1.0]),
+                attenuation: self.attenuation.clone(),
             }
         } else {
             ScatterInfo {
                 scattered: Ray { origin: rec.p, direction: refract(ray.direction, rec.normal, ri).unit() },
-                attenuation: vector!(3 [1.0, 1.0, 1.0]),
+                attenuation: self.attenuation.clone(),
             }
         })
     }

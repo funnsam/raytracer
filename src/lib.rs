@@ -38,8 +38,8 @@ impl Raytracer {
             look_at: vector!(3 [0.0, 0.0, -1.0]),
             camera_up: vector!(3 [0.0, 1.0, 0.0]),
             vfov: std::f32::consts::FRAC_PI_2,
-            focus_angle: std::f32::consts::PI / 20.0,
-            focus_dist: 1.35,
+            focus_angle: 0.0, // std::f32::consts::PI / 20.0,
+            focus_dist: 1.60857079421,
             world: World(vec![
                 Object {
                     geometry: Geometry::Plane(Plane {
@@ -99,94 +99,29 @@ impl Raytracer {
                 // Cornell box objects
                 Object {
                     geometry: Geometry::Sphere(Sphere {
-                        center: vector!(3 [0.25, -0.65, -1.35]),
-                        radius: 0.35
+                        center: vector!(3 [0.25, -0.05, -1.4]),
+                        radius: 0.25
                     }),
                     material: Material::Dielectric(Dielectric {
-                        refraction_index: 1.5,
+                        attenuation: vector!(3 [0.8, 0.8, 1.0]),
+                        refraction_index: 2.417,
                     }),
                 },
                 Object {
                     geometry: Geometry::Sphere(Sphere {
-                        center: vector!(3 [-0.25, -0.65, -1.6]),
-                        radius: 0.35
+                        center: vector!(3 [-0.25, -0.4, -1.45]),
+                        radius: 0.25
                     }),
                     material: Material::Metal(Metal {
-                        albedo: vector!(3 [0.8, 0.8, 0.8]),
-                        fuzz: 0.3,
+                        albedo: vector!(3 [0.72, 0.45, 0.2]),
+                        fuzz: 0.4,
                     }),
                 },
             ]),
 
             lights: vec![
-                vector!(3 [1.0, 0.0, 0.0]),
+                vector!(3 [0.0, 0.99, -1.0]),
             ],
-
-            /*
-            // Simple scene with balls
-            look_from: vector!(3 [-2.0, 2.0, 1.0]),
-            look_at: vector!(3 [0.0, 0.0, -1.0]),
-            camera_up: vector!(3 [0.0, 1.0, 0.0]),
-            vfov: std::f32::consts::FRAC_PI_4,
-            focal_len: 1.0,
-            objects: vec![
-                Object {
-                    geometry: hittable::Geometry::Sphere(hittable::Sphere {
-                        center: vector!(3 [0.0, 3.0, -3.0]),
-                        radius: 1.0,
-                    }),
-                    material: material::Material::DiffuseLight(material::DiffuseLight {
-                        emits: vector!(3 [4.0, 4.0, 3.6]),
-                    }),
-                },
-                Object {
-                    geometry: hittable::Geometry::Sphere(hittable::Sphere {
-                        center: vector!(3 [-1.0, 0.0, -1.0]),
-                        radius: 0.5,
-                    }),
-                    material: material::Material::Dielectric(material::Dielectric {
-                        refraction_index: 1.5,
-                    }),
-                },
-                Object {
-                    geometry: hittable::Geometry::Sphere(hittable::Sphere {
-                        center: vector!(3 [-1.0, 0.0, -1.0]),
-                        radius: 0.4,
-                    }),
-                    material: material::Material::Dielectric(material::Dielectric {
-                        refraction_index: 1.0 / 1.5,
-                    }),
-                },
-                Object {
-                    geometry: hittable::Geometry::Sphere(hittable::Sphere {
-                        center: vector!(3 [0.0, 0.0, -1.0]),
-                        radius: 0.5,
-                    }),
-                    material: material::Material::Lambertian(material::Lambertian {
-                        albedo: vector!(3 [0.1, 0.2, 0.5]),
-                    }),
-                },
-                Object {
-                    geometry: hittable::Geometry::Sphere(hittable::Sphere {
-                        center: vector!(3 [1.0, 0.0, -1.0]),
-                        radius: 0.5,
-                    }),
-                    material: material::Material::Metal(material::Metal {
-                        albedo: vector!(3 [0.8, 0.6, 0.2]),
-                        fuzz: 1.0,
-                    }),
-                },
-                Object {
-                    geometry: hittable::Geometry::Plane(hittable::Plane {
-                        position: vector!(3 [0.0, -0.5, 0.0]),
-                        normal: vector!(3 [0.0, -1.0, 0.0]),
-                    }),
-                    material: material::Material::Lambertian(material::Lambertian {
-                        albedo: vector!(3 [0.8, 0.8, 0.0]),
-                    }),
-                },
-            ],
-            */
 
             samples: 16,
             bounces: 20,
@@ -262,10 +197,18 @@ impl Raytracer {
         let mut color = Matrix::new_zeroed();
         let mut throughput = vector!(3 [1.0, 1.0, 1.0]);
 
-        for _ in 0..self.bounces {
+        for i in 0..self.bounces {
             if let Some((r, idx)) = self.world.hit(&ray, 0.001, f32::INFINITY) {
                 let mat = &self.world.0[idx].material;
                 let mut emits = mat.emits(&ray, &r);
+
+                // russian roulette
+                let p = throughput[0].max(throughput[1]).max(throughput[2]);
+                if rand::random::<f32>() > p {
+                    break;
+                }
+
+                throughput = throughput / p;
 
                 // nee optimization
                 if let Some(sl_at) = self.get_sample_light() {
@@ -273,20 +216,13 @@ impl Raytracer {
                     let sl_ray = Ray { origin: r.p.clone(), direction: sl_dir };
 
                     if let Some(sl_emits) = self.world.hit(&sl_ray, 0.01, f32::INFINITY).map(|(r, i)| self.world.0[i].material.emits(&sl_ray, &r)) {
-                        emits = (emits + &sl_emits) * 0.5;
+                        emits = (emits + &sl_emits) * if i == 0 { 0.5 } else { 1.0 };
                     }
                 }
 
                 if let Some(s) = mat.scatter(ray, r) {
                     throughput = throughput * &s.attenuation;
 
-                    // russian roulette
-                    let p = throughput[0].max(throughput[1]).max(throughput[2]);
-                    if rand::random::<f32>() > p {
-                        break;
-                    }
-
-                    throughput = throughput / p;
                     ray = s.scattered;
                     color = color + &(emits * &throughput);
                 } else {
